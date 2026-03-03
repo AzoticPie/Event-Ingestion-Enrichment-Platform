@@ -1,0 +1,2 @@
+This directory stores Alembic revision files.
+
