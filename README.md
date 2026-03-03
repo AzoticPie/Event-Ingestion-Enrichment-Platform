@@ -54,3 +54,41 @@ uvicorn event_platform.main:app --reload
 - `alembic/` migration scaffolding
 - `tests/` baseline tests
 
+## Milestone 2 database workflow
+
+1. Install dependencies:
+
+   ```bash
+   pip install -e .[dev]
+   ```
+
+2. Configure DB env for local non-Docker runs (example):
+
+   ```bash
+   set POSTGRES_HOST=localhost
+   set POSTGRES_PORT=5432
+   set POSTGRES_DB=event_platform
+   set POSTGRES_USER=event_platform
+   set POSTGRES_PASSWORD=event_platform
+   ```
+
+3. Run migration cycle:
+
+   ```bash
+   alembic upgrade head
+   alembic downgrade base
+   alembic upgrade head
+   ```
+
+4. Seed demo tenant and ingestion key:
+
+   ```bash
+   python -m event_platform.infrastructure.db.seed
+   ```
+
+5. Run tests:
+
+   ```bash
+   pytest -q
+   ```
+
