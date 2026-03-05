@@ -8,6 +8,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from event_platform.core.normalization import canonical_event_type
 from event_platform.infrastructure.db.models import EventNormalized, EventRaw
 
 
@@ -63,6 +64,26 @@ class EventRawRepository:
             EventRaw.dedupe_hash == dedupe_hash,
         )
         return self._session.execute(stmt).scalar_one_or_none()
+
+    def list_with_normalized(
+        self,
+        tenant_id: uuid.UUID,
+        limit: int,
+        event_type: str | None,
+    ) -> list[tuple[EventRaw, EventNormalized]]:
+        stmt = (
+            select(EventRaw, EventNormalized)
+            .join(EventNormalized, EventNormalized.event_id == EventRaw.id)
+            .where(EventRaw.tenant_id == tenant_id)
+            .order_by(EventNormalized.occurred_at_utc.desc(), EventRaw.id.desc())
+            .limit(limit)
+        )
+
+        if event_type is not None:
+            stmt = stmt.where(EventNormalized.event_type_canonical == canonical_event_type(event_type))
+
+        rows = self._session.execute(stmt).all()
+        return [(raw, normalized) for raw, normalized in rows]
 
 
 class EventNormalizedRepository:

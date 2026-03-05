@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
-import secrets
 
+from event_platform.core.security import ingestion_key_hash, ingestion_key_prefix
+from event_platform.infrastructure.db.session import session_scope
 from event_platform.infrastructure.repositories.keys_repo import IngestionKeyRepository
 from event_platform.infrastructure.repositories.tenants_repo import TenantRepository
-from event_platform.infrastructure.db.session import session_scope
 
 DEFAULT_TENANT_NAME = "demo-workspace"
 
 
 def _build_key_material(raw_key: str) -> tuple[str, str]:
-    digest = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
-    prefix = raw_key[:8]
+    prefix = ingestion_key_prefix(raw_key)
+    digest = ingestion_key_hash(raw_key)
     return prefix, digest
 
 

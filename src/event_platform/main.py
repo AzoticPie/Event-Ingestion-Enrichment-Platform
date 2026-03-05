@@ -2,7 +2,9 @@
 
 from fastapi import FastAPI
 
+from event_platform.api.routes.events import router as events_router
 from event_platform.api.routes.health import router as health_router
+from event_platform.api.routes.ingestion import router as ingestion_router
 from event_platform.core.config import get_settings
 from event_platform.core.logging import configure_logging
 
@@ -19,6 +21,8 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
     app.include_router(health_router)
+    app.include_router(ingestion_router)
+    app.include_router(events_router)
     return app
 
 
