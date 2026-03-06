@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     redis_host: str = "redis"
     redis_port: int = 6379
 
+    celery_enrichment_queue: str = "enrichment.default"
+    enrichment_max_retries: int = 5
+    enrichment_backoff_base_seconds: int = 2
+    geoip_db_path: str = "/data/GeoLite2-Country.mmdb"
+
     enable_readiness_dependency_checks: bool = True
 
     @property

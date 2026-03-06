@@ -23,6 +23,7 @@ class IngestionResult:
     event_id: uuid.UUID
     status: str
     duplicate_reason: str | None = None
+    queued_for_enrichment: bool = False
 
 
 class IngestionService:
@@ -61,6 +62,7 @@ class IngestionService:
                     event_id=existing_by_key.id,
                     status="duplicate",
                     duplicate_reason="idempotency_key",
+                    queued_for_enrichment=False,
                 )
 
         existing_by_hash = raw_repo.find_by_dedupe_hash(tenant_id, dedupe_hash)
@@ -69,6 +71,7 @@ class IngestionService:
                 event_id=existing_by_hash.id,
                 status="duplicate",
                 duplicate_reason="dedupe_hash",
+                queued_for_enrichment=False,
             )
 
         event_raw = raw_repo.create(
@@ -111,7 +114,7 @@ class IngestionService:
             ingestion_date=occurred_at_utc.date(),
         )
 
-        return IngestionResult(event_id=event_raw.id, status="accepted")
+        return IngestionResult(event_id=event_raw.id, status="accepted", queued_for_enrichment=True)
 
 
 def _ensure_utc(value: datetime) -> datetime:

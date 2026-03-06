@@ -212,3 +212,91 @@ def test_dedupe_hash_distinguishes_extended_payload_fields() -> None:
     assert second.json()["result"]["status"] == "accepted"
     assert first.json()["result"]["event_id"] != second.json()["result"]["event_id"]
 
+
+@pytest.mark.integration
+def test_batch_ingestion_continues_when_one_publish_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    if not _db_available():
+        pytest.skip("PostgreSQL unavailable for batch enrichment publish integration test")
+
+    from fastapi.testclient import TestClient
+
+    from event_platform.api.routes import ingestion as ingestion_route
+    from event_platform.main import app
+
+    tenant_name = f"batch-publish-failure-{uuid.uuid4().hex[:8]}"
+    raw_key = f"ing_{uuid.uuid4().hex}{uuid.uuid4().hex}"
+    key_prefix = ingestion_key_prefix(raw_key)
+    key_hash = ingestion_key_hash(raw_key)
+
+    with session_scope() as session:
+        tenant_id = uuid.uuid4()
+        key_id = uuid.uuid4()
+        session.execute(
+            text("INSERT INTO tenant (id, name, status) VALUES (:id, :name, :status)"),
+            {"id": str(tenant_id), "name": tenant_name, "status": "active"},
+        )
+        session.execute(
+            text(
+                "INSERT INTO ingestion_key (id, tenant_id, key_prefix, key_hash, is_active) "
+                "VALUES (:id, :tenant_id, :key_prefix, :key_hash, true)"
+            ),
+            {
+                "id": str(key_id),
+                "tenant_id": str(tenant_id),
+                "key_prefix": key_prefix,
+                "key_hash": key_hash,
+            },
+        )
+
+    publish_calls: list[str] = []
+
+    def _fake_apply_async(*args, **kwargs):
+        event_id = kwargs.get("args", [None])[0]
+        publish_calls.append(event_id)
+        if len(publish_calls) == 1:
+            raise RuntimeError("simulated broker outage")
+        return {"task_id": f"fake-{event_id}"}
+
+    monkeypatch.setattr(ingestion_route.enrich_event, "apply_async", _fake_apply_async)
+
+    client = TestClient(app)
+    payload = {
+        "events": [
+            {
+                "event_type": "batch_event",
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "source": "tests",
+                "session_id": "s-1",
+                "attributes": {"idx": 1},
+            },
+            {
+                "event_type": "batch_event",
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "source": "tests",
+                "session_id": "s-2",
+                "attributes": {"idx": 2},
+            },
+        ]
+    }
+
+    response = client.post("/v1/ingest/events:batch", json=payload, headers={"X-Ingest-Key": raw_key})
+    assert response.status_code == 202
+    assert len(publish_calls) == 2
+
+    results = response.json()["results"]
+    first_event_id = results[0]["event_id"]
+    second_event_id = results[1]["event_id"]
+
+    with session_scope() as session:
+        first_status = session.execute(
+            text("SELECT ingest_status FROM event_raw WHERE id = :event_id"),
+            {"event_id": first_event_id},
+        ).scalar_one()
+        second_status = session.execute(
+            text("SELECT ingest_status FROM event_raw WHERE id = :event_id"),
+            {"event_id": second_event_id},
+        ).scalar_one()
+
+    assert first_status == "failed_terminal"
+    assert second_status == "queued"
+

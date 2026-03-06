@@ -24,6 +24,7 @@ class QueryService:
 
         result: list[dict[str, object]] = []
         for raw, normalized in rows:
+            enriched = raw.enriched
             result.append(
                 {
                     "event_id": raw.id,
@@ -37,6 +38,13 @@ class QueryService:
                     "referrer": normalized.referrer,
                     "received_at": raw.received_at,
                     "ingest_status": raw.ingest_status,
+                    "geo_country": enriched.geo_country if enriched is not None else None,
+                    "ua_browser": enriched.ua_browser if enriched is not None else None,
+                    "ua_os": enriched.ua_os if enriched is not None else None,
+                    "ua_device": enriched.ua_device if enriched is not None else None,
+                    "url_host": enriched.url_host if enriched is not None else None,
+                    "referrer_domain": enriched.referrer_domain if enriched is not None else None,
+                    "is_bot": enriched.is_bot if enriched is not None else False,
                 }
             )
         return result

@@ -1,11 +1,11 @@
-"""SQLAlchemy models for milestone 2 core tables."""
+"""SQLAlchemy models for core ingestion and enrichment tables."""
 
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -88,6 +88,8 @@ class EventRaw(Base):
     ingest_status: Mapped[str] = mapped_column(String(32), nullable=False, default="accepted")
 
     normalized: Mapped[EventNormalized | None] = relationship(back_populates="event_raw", uselist=False)
+    enriched: Mapped[EventEnriched | None] = relationship(back_populates="event_raw", uselist=False)
+    failed_enrichment: Mapped[FailedEnrichment | None] = relationship(back_populates="event_raw", uselist=False)
 
 
 class EventNormalized(Base):
@@ -131,4 +133,75 @@ class EventNormalized(Base):
     ingestion_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     event_raw: Mapped[EventRaw] = relationship(back_populates="normalized")
+
+
+class EventEnriched(Base):
+    """Asynchronous enrichment projection keyed by event id."""
+
+    __tablename__ = "event_enriched"
+    __table_args__ = (
+        Index("ix_event_enriched_tenant_enriched_at", "tenant_id", "enriched_at"),
+        Index("ix_event_enriched_tenant_geo_country", "tenant_id", "geo_country"),
+        Index("ix_event_enriched_tenant_is_bot", "tenant_id", "is_bot"),
+        Index("ix_event_enriched_tenant_url_host", "tenant_id", "url_host"),
+    )
+
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("event_raw.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenant.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    geo_country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ua_browser: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ua_os: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ua_device: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    url_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    url_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    referrer_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    schema_tag: Mapped[str] = mapped_column(String(64), nullable=False, default="m4_baseline")
+    enriched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+    event_raw: Mapped[EventRaw] = relationship(back_populates="enriched")
+
+
+class FailedEnrichment(Base):
+    """Durable failed enrichment records for retries and terminal states."""
+
+    __tablename__ = "failed_enrichment"
+    __table_args__ = (
+        Index("ix_failed_enrichment_tenant_status_failed_at", "tenant_id", "status", "failed_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("event_raw.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenant.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    stage: Mapped[str] = mapped_column(String(64), nullable=False)
+    error_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    last_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    event_raw: Mapped[EventRaw] = relationship(back_populates="failed_enrichment")
 

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
+import structlog
 from sqlalchemy.orm import Session
 
 from event_platform.api.dependencies import AuthContext, get_authenticated_tenant
@@ -16,9 +18,14 @@ from event_platform.api.schemas.ingestion import (
     IngestSingleResponse,
 )
 from event_platform.application.ingestion_service import IngestionService
+from event_platform.core.config import get_settings
+from event_platform.infrastructure.repositories.events_repo import EventRepository
 from event_platform.infrastructure.db.session import get_session, transaction
+from event_platform.worker.tasks.enrichment import enrich_event
 
 router = APIRouter(prefix="/v1/ingest", tags=["ingestion"])
+settings = get_settings()
+logger = structlog.get_logger(__name__)
 
 SENSITIVE_HEADER_NAMES = {
     "authorization",
@@ -51,6 +58,12 @@ def ingest_event(
             user_agent=request.headers.get("user-agent"),
         )
 
+    if result.queued_for_enrichment:
+        try:
+            _publish_enrichment_task(session=session, event_id=result.event_id)
+        except Exception:
+            logger.exception("enrichment_publish_failed_for_single_event", event_id=str(result.event_id))
+
     return IngestSingleResponse(
         result=IngestedEventResult(
             event_id=result.event_id,
@@ -71,6 +84,7 @@ def ingest_events_batch(
     service = IngestionService()
     headers_jsonb = _request_headers(request)
     results: list[IngestedEventResult] = []
+    accepted_ids: list[str] = []
 
     with transaction(session):
         for event in payload.events:
@@ -89,6 +103,14 @@ def ingest_events_batch(
                     duplicate_reason=ingest_result.duplicate_reason,
                 )
             )
+            if ingest_result.queued_for_enrichment:
+                accepted_ids.append(str(ingest_result.event_id))
+
+    for accepted_event_id in accepted_ids:
+        try:
+            _publish_enrichment_task(session=session, event_id=accepted_event_id)
+        except Exception:
+            logger.exception("enrichment_publish_failed_for_batch_event", event_id=accepted_event_id)
 
     accepted_count = sum(1 for item in results if item.status == "accepted")
     duplicate_count = len(results) - accepted_count
@@ -107,4 +129,18 @@ def _request_headers(request: Request) -> dict[str, Any]:
         for key, value in request.headers.items()
         if key.lower() not in SENSITIVE_HEADER_NAMES
     }
+
+
+def _publish_enrichment_task(session: Session, event_id: object) -> None:
+    event_id_str = str(event_id)
+    event_uuid = uuid.UUID(event_id_str)
+    repo = EventRepository(session)
+    try:
+        enrich_event.apply_async(args=[event_id_str], queue=settings.celery_enrichment_queue)
+        with transaction(session):
+            repo.set_ingest_status(event_uuid, "queued")
+    except Exception:
+        with transaction(session):
+            repo.set_ingest_status(event_uuid, "failed_terminal")
+        raise
 

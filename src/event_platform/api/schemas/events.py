@@ -22,6 +22,13 @@ class EventListItem(BaseModel):
     referrer: str | None
     received_at: datetime
     ingest_status: str
+    geo_country: str | None
+    ua_browser: str | None
+    ua_os: str | None
+    ua_device: str | None
+    url_host: str | None
+    referrer_domain: str | None
+    is_bot: bool
 
 
 class EventListResponse(BaseModel):
