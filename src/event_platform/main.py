@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 
+from event_platform.api.routes.aggregates import router as aggregates_router
 from event_platform.api.routes.events import router as events_router
 from event_platform.api.routes.health import router as health_router
 from event_platform.api.routes.ingestion import router as ingestion_router
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(ingestion_router)
     app.include_router(events_router)
+    app.include_router(aggregates_router)
     return app
 
 

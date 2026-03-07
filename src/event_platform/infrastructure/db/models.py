@@ -51,6 +51,7 @@ class EventRaw(Base):
         Index("ix_event_raw_tenant_received_at", "tenant_id", "received_at"),
         Index("ix_event_raw_tenant_event_type", "tenant_id", "event_type_original"),
         Index("ix_event_raw_tenant_dedupe_hash", "tenant_id", "dedupe_hash"),
+        Index("ix_event_raw_tenant_ingest_status_received_at", "tenant_id", "ingest_status", "received_at"),
         Index(
             "ux_event_raw_tenant_idempotency_key_not_null",
             "tenant_id",
@@ -105,6 +106,24 @@ class EventNormalized(Base):
             "occurred_at_utc",
         ),
         Index(
+            "ix_event_normalized_tenant_source_occurred_at",
+            "tenant_id",
+            "source",
+            "occurred_at_utc",
+        ),
+        Index(
+            "ix_event_normalized_tenant_severity_occurred_at",
+            "tenant_id",
+            "severity",
+            "occurred_at_utc",
+        ),
+        Index(
+            "ix_event_normalized_tenant_session_occurred_at",
+            "tenant_id",
+            "session_id",
+            "occurred_at_utc",
+        ),
+        Index(
             "ix_event_normalized_tenant_user_occurred_at",
             "tenant_id",
             "user_id",
@@ -142,7 +161,9 @@ class EventEnriched(Base):
     __table_args__ = (
         Index("ix_event_enriched_tenant_enriched_at", "tenant_id", "enriched_at"),
         Index("ix_event_enriched_tenant_geo_country", "tenant_id", "geo_country"),
+        Index("ix_event_enriched_tenant_geo_country_event_id", "tenant_id", "geo_country", "event_id"),
         Index("ix_event_enriched_tenant_is_bot", "tenant_id", "is_bot"),
+        Index("ix_event_enriched_tenant_is_bot_event_id", "tenant_id", "is_bot", "event_id"),
         Index("ix_event_enriched_tenant_url_host", "tenant_id", "url_host"),
     )
 

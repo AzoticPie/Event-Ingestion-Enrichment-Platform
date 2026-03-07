@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
-    postgres_host: str = "postgres"
+    postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "event_platform"
     postgres_user: str = "event_platform"

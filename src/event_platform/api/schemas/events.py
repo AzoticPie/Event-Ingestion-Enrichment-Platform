@@ -35,5 +35,14 @@ class EventListResponse(BaseModel):
     """Response envelope for event list endpoint."""
 
     count: int
+    has_more: bool
+    next_cursor: str | None
     items: list[EventListItem]
+
+
+class EventDetailResponse(BaseModel):
+    """Response envelope for event detail endpoint."""
+
+    item: EventListItem
+
 
