@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from event_platform.infrastructure.db.models import Tenant
@@ -28,4 +28,18 @@ class TenantRepository:
     def get_by_name(self, name: str) -> Tenant | None:
         stmt = select(Tenant).where(Tenant.name == name)
         return self._session.execute(stmt).scalar_one_or_none()
+
+    def list_active_tenant_ids(self, limit: int, offset: int = 0) -> list[uuid.UUID]:
+        stmt = (
+            select(Tenant.id)
+            .where(Tenant.status == "active")
+            .order_by(Tenant.id.asc())
+            .offset(max(0, offset))
+            .limit(max(1, limit))
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
+    def count_active_tenants(self) -> int:
+        stmt = select(func.count(Tenant.id)).where(Tenant.status == "active")
+        return int(self._session.execute(stmt).scalar_one())
 

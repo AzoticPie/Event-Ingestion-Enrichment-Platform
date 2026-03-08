@@ -5,7 +5,20 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -225,4 +238,96 @@ class FailedEnrichment(Base):
     last_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     event_raw: Mapped[EventRaw] = relationship(back_populates="failed_enrichment")
+
+
+class AggregateRollup(Base):
+    """Materialized minute-bucket aggregates for dashboard read paths."""
+
+    __tablename__ = "aggregate_rollup"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "bucket_start",
+            "bucket_granularity",
+            "metric_name",
+            "dimension_key",
+            name="uq_aggregate_rollup_bucket_metric_dimension",
+        ),
+        CheckConstraint(
+            "(metric_name = 'events.count' AND dimension_key = '__all__') "
+            "OR (metric_name <> 'events.count' AND dimension_key <> '__all__')",
+            name="ck_aggregate_rollup_dimension_policy",
+        ),
+        Index(
+            "ix_aggregate_rollup_tenant_metric_bucket_start",
+            "tenant_id",
+            "metric_name",
+            "bucket_start",
+        ),
+        Index(
+            "ix_aggregate_rollup_tenant_metric_bucket_dimension",
+            "tenant_id",
+            "metric_name",
+            "bucket_start",
+            "dimension_key",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenant.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    bucket_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    bucket_granularity: Mapped[str] = mapped_column(String(16), nullable=False, default="minute")
+    metric_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    dimension_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    metric_value: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class AggregateRollupCoverageSegment(Base):
+    """Coverage segments proving which windows are fully materialized."""
+
+    __tablename__ = "aggregate_rollup_coverage_segment"
+    __table_args__ = (
+        CheckConstraint("segment_start < segment_end", name="ck_rollup_coverage_segment_bounds"),
+        UniqueConstraint(
+            "tenant_id",
+            "bucket_granularity",
+            "metric_group",
+            "segment_start",
+            "segment_end",
+            name="uq_rollup_coverage_segment",
+        ),
+        Index(
+            "ix_rollup_coverage_tenant_granularity_group_bounds",
+            "tenant_id",
+            "bucket_granularity",
+            "metric_group",
+            "segment_start",
+            "segment_end",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenant.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    bucket_granularity: Mapped[str] = mapped_column(String(16), nullable=False, default="minute")
+    metric_group: Mapped[str] = mapped_column(String(64), nullable=False, default="core_dashboard")
+    segment_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    segment_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
 

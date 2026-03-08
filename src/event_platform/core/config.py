@@ -31,6 +31,18 @@ class Settings(BaseSettings):
     enrichment_backoff_base_seconds: int = 2
     geoip_db_path: str = "/data/GeoLite2-Country.mmdb"
 
+    aggregate_rollup_enabled: bool = False
+    aggregate_rollup_refresh_lookback_minutes: int = 180
+    aggregate_rollup_refresh_interval_seconds: int = 60
+    aggregate_rollup_refresh_tenants_per_tick: int = 100
+    aggregate_rollup_refresh_max_inflight_tenant_tasks: int = 20
+    aggregate_rollup_backfill_chunk_minutes: int = 1440
+    aggregate_rollup_backfill_max_chunks_per_task: int = 24
+    aggregate_rollup_lock_retry_max_attempts: int = 8
+    aggregate_rollup_lock_retry_base_seconds: int = 5
+    aggregate_rollup_max_window_minutes: int = 10080
+    celery_rollup_queue: str = "rollup.default"
+
     enable_readiness_dependency_checks: bool = True
 
     @property

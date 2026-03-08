@@ -83,6 +83,7 @@ def test_aggregate_endpoints() -> None:
     )
     assert count_resp.status_code == 200
     assert count_resp.json()["value"] >= 4
+    assert count_resp.json()["data_source"] in {"direct_query", "rollup"}
 
     top_types = client.get(
         "/v1/aggregates/top-event-types",
@@ -91,6 +92,7 @@ def test_aggregate_endpoints() -> None:
     )
     assert top_types.status_code == 200
     assert len(top_types.json()["items"]) >= 1
+    assert top_types.json()["data_source"] in {"direct_query", "rollup"}
 
     top_urls = client.get(
         "/v1/aggregates/top-urls",
@@ -98,6 +100,7 @@ def test_aggregate_endpoints() -> None:
         headers={"X-Ingest-Key": raw_key},
     )
     assert top_urls.status_code == 200
+    assert top_urls.json()["data_source"] in {"direct_query", "rollup"}
 
     unique_users = client.get(
         "/v1/aggregates/unique-users",
@@ -106,6 +109,7 @@ def test_aggregate_endpoints() -> None:
     )
     assert unique_users.status_code == 200
     assert unique_users.json()["value"] >= 1
+    assert unique_users.json()["data_source"] == "direct_query"
 
     invalid_window_count = client.get(
         "/v1/aggregates/count",

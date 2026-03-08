@@ -264,6 +264,7 @@ class EventRawRepository:
             .join(EventEnriched, EventEnriched.event_id == EventRaw.id)
             .where(EventRaw.tenant_id == tenant_id)
             .where(EventEnriched.url_host.is_not(None))
+            .where(func.length(func.btrim(EventEnriched.url_host)) > 0)
             .group_by(EventEnriched.url_host)
             .order_by(desc("value"), asc(EventEnriched.url_host))
             .limit(limit)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+import structlog
 from sqlalchemy.orm import Session
 
 from event_platform.api.dependencies import AuthContext, get_authenticated_tenant
@@ -18,6 +19,7 @@ from event_platform.application.query_service import QueryValidationError
 from event_platform.infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/v1/aggregates", tags=["aggregates"])
+logger = structlog.get_logger(__name__)
 
 
 def _require_time_bound(occurred_from: datetime | None, occurred_to: datetime | None) -> None:
@@ -65,6 +67,12 @@ def aggregate_count(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "validation_failed", "message": str(exc)},
         ) from exc
+    except Exception:
+        logger.exception("aggregate_count_unexpected_failure", tenant_id=str(auth.tenant_id))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "internal_error", "message": "Unexpected aggregate error"},
+        )
     return AggregateCountResponse.model_validate(payload)
 
 
@@ -99,6 +107,12 @@ def aggregate_top_event_types(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "validation_failed", "message": str(exc)},
         ) from exc
+    except Exception:
+        logger.exception("aggregate_top_event_types_unexpected_failure", tenant_id=str(auth.tenant_id))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "internal_error", "message": "Unexpected aggregate error"},
+        )
     return AggregateBucketsResponse.model_validate(payload)
 
 
@@ -135,6 +149,12 @@ def aggregate_top_urls(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "validation_failed", "message": str(exc)},
         ) from exc
+    except Exception:
+        logger.exception("aggregate_top_urls_unexpected_failure", tenant_id=str(auth.tenant_id))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "internal_error", "message": "Unexpected aggregate error"},
+        )
     return AggregateBucketsResponse.model_validate(payload)
 
 
@@ -169,5 +189,11 @@ def aggregate_unique_users(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "validation_failed", "message": str(exc)},
         ) from exc
+    except Exception:
+        logger.exception("aggregate_unique_users_unexpected_failure", tenant_id=str(auth.tenant_id))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "internal_error", "message": "Unexpected aggregate error"},
+        )
     return AggregateUniqueUsersResponse.model_validate(payload)
 
