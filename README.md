@@ -2,13 +2,24 @@
 
 Backend service for tenant-scoped event ingestion, asynchronous enrichment, and query/aggregate APIs.
 
-## Milestone 1 scope
+## Current progress snapshot 
 
-- Project skeleton and dependency management
-- Configuration and structured logging
-- Health and readiness endpoints
-- Architecture docs, API spec draft, ADRs
-- Docker Compose setup for API, worker, Postgres, and Redis
+### Completed
+
+- **Backend API routes are implemented and wired**: health/readiness, ingestion (single + batch), event query/detail, and aggregate endpoints are active in the FastAPI app.
+- **Async worker pipelines are implemented**: Celery tasks exist for enrichment and rollup refresh/backfill flows, including queue routing and beat schedule wiring.
+- **Database schema and migrations are in place through rollups**: Alembic revisions cover core tables, enrichment tables, query indexes, and rollup/coverage tables.
+- **Frontend MVP pages are implemented**: Health, Ingestion, Events Explorer, Aggregates, and Settings pages are present and routed.
+- **Automated test coverage is substantial** across integration and unit suites, including health, ingestion, query APIs, aggregate APIs, enrichment pipeline, repositories, seed workflow, and rollup scheduler/windowing/coverage behaviors.
+
+### In progress
+
+- **Rollup-backed aggregate reads are partially adopted by design**: count/top-event-types/top-urls can use rollups when window coverage exists and filters permit; direct-query fallback remains active for unsupported filter combinations.
+- **`unique-users` remains direct-query** (not rollup-backed), consistent with the current implementation.
+
+### Next (from existing repository plans)
+
+- Continue executing the implementation plans already tracked in `plans/`, with focus on operational hardening and incremental aggregate/rollup improvements documented there.
 
 ## Tech stack
 
@@ -16,8 +27,9 @@ Backend service for tenant-scoped event ingestion, asynchronous enrichment, and 
 - FastAPI
 - PostgreSQL
 - Redis
-- SQLAlchemy 2.0 (wired in next milestone)
+- SQLAlchemy 2.0
 - Celery
+- React + Vite (frontend)
 
 ## Quickstart
 
@@ -69,10 +81,10 @@ uvicorn event_platform.main:app --reload
 
 - `src/event_platform/` application package
 - `docs/` architecture, API spec, ADRs
-- `alembic/` migration scaffolding
-- `tests/` baseline tests
+- `alembic/` migration scripts (core, enrichment, query indexes, rollups)
+- `tests/` integration and unit coverage for API, enrichment, repositories, and rollup logic
 
-## Milestone 2 database workflow
+## Database workflow (migrations, seed, tests)
 
 1. Install dependencies:
 
