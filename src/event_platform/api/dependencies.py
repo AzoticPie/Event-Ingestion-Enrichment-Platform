@@ -22,10 +22,16 @@ class AuthContext:
 
 
 def get_authenticated_tenant(
-    x_ingest_key: str = Header(alias="X-Ingest-Key"),
+    x_ingest_key: str | None = Header(default=None, alias="X-Ingest-Key"),
     session: Session = Depends(get_session),
 ) -> AuthContext:
     """Validate ingestion API key and return tenant context."""
+    if not x_ingest_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "auth_failed", "message": "Missing ingestion key"},
+        )
+
     prefix = ingestion_key_prefix(x_ingest_key)
     key_repo = IngestionKeyRepository(session)
     key_record = key_repo.find_active_by_prefix(prefix)

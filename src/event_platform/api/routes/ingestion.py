@@ -136,7 +136,13 @@ def _publish_enrichment_task(session: Session, event_id: object) -> None:
     event_uuid = uuid.UUID(event_id_str)
     repo = EventRepository(session)
     try:
-        enrich_event.apply_async(args=[event_id_str], queue=settings.celery_enrichment_queue)
+        async_result = enrich_event.apply_async(args=[event_id_str], queue=settings.celery_enrichment_queue)
+        logger.info(
+            "enrichment_task_published",
+            event_id=event_id_str,
+            task_id=async_result.id,
+            queue=settings.celery_enrichment_queue,
+        )
         with transaction(session):
             repo.set_ingest_status(event_uuid, "queued")
     except Exception:

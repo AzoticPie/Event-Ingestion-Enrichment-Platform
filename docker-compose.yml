@@ -1,4 +1,22 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_DEFAULT_INGEST_KEY: ${FRONTEND_VITE_DEFAULT_INGEST_KEY:-}
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
   api:
     build:
       context: .
@@ -37,6 +55,7 @@ services:
         "-A",
         "event_platform.worker.celery_app:celery_app",
         "worker",
+        "--queues=enrichment.default,rollup.default",
         "--loglevel=INFO",
       ]
     depends_on:

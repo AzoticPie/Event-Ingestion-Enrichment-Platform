@@ -150,6 +150,17 @@ def _record_failure(
     task_id: str | None,
     lifecycle_state: str,
 ) -> None:
+    logger.warning(
+        "enrichment_failure_recording",
+        event_id=str(event_uuid),
+        stage=stage,
+        error_code=error_code,
+        attempts=attempts,
+        status=status,
+        lifecycle_state=lifecycle_state,
+        task_id=task_id,
+        next_retry_at=next_retry_at_utc.isoformat() if next_retry_at_utc else None,
+    )
     with session_scope() as session:
         repo = EventRepository(session)
         loaded = repo.get_raw_with_normalized(event_uuid)

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
-    postgres_host: str = "localhost"
+    postgres_host: str = "postgres"
     postgres_port: int = 5432
     postgres_db: str = "event_platform"
     postgres_user: str = "event_platform"
@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     celery_rollup_queue: str = "rollup.default"
 
     enable_readiness_dependency_checks: bool = True
+    cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
     def postgres_dsn(self) -> str:
@@ -57,6 +58,11 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         """Build Redis URL."""
         return f"redis://{self.redis_host}:{self.redis_port}/0"
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        """Parse comma-separated CORS origins into a normalized list."""
+        return [origin.strip() for origin in self.cors_allow_origins.split(",") if origin.strip()]
 
 
 @lru_cache(maxsize=1)

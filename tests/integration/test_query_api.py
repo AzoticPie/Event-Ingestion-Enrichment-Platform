@@ -4,8 +4,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from event_platform.main import app
 from event_platform.core.security import ingestion_key_hash, ingestion_key_prefix
 from event_platform.infrastructure.db.session import session_scope
 
@@ -17,6 +19,13 @@ def _db_available() -> bool:
         return True
     except Exception:
         return False
+
+
+def test_events_list_missing_ingestion_key_returns_401() -> None:
+    client = TestClient(app)
+    response = client.get("/v1/events", params={"limit": 50, "sort": "desc"})
+    assert response.status_code == 401
+    assert response.json() == {"detail": {"code": "auth_failed", "message": "Missing ingestion key"}}
 
 
 @pytest.mark.integration
